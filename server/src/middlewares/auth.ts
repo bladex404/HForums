@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import User from "../models/user.model";
-import { UserType } from "../types/userType";
+import { UserType } from "../types/types";
 const ST = process.env.SECRET_KEY;
 declare global {
   namespace Express {
@@ -11,6 +11,7 @@ declare global {
     }
   }
 }
+
 export const auth = async (
   req: Request,
   res: Response,
