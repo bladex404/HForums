@@ -11,4 +11,5 @@ export const generateJwtAndSetCookie = async (
   res.cookie("token", token, {
     maxAge: 15 * 24 * 3600 * 1000,
   });
+  return token;
 };

@@ -1,23 +1,13 @@
 import User from "../models/user.model";
-import { UserType } from "../schemas/user.schema";
-import { Request, Response } from "express";
+import { Request, RequestHandler, Response, Router } from "express";
 import { generateHash } from "../utils/hashPassword";
 import { generateJwtAndSetCookie } from "../utils/generateJwt";
 import bcrypt from "bcrypt";
-import {
-  LoginSchema,
-  RegisterSchema,
-  UserSchema,
-} from "../schemas/user.schema";
-const register = async (req: Request, res: Response): Promise<void> => {
+import middleware, { CustomRequest } from "../middlewares/middleware";
+const userRouter = Router();
+userRouter.post("/register", async (req: Request, res: Response) => {
   try {
-    let data = RegisterSchema.safeParse(req.body);
-    if (!data.success) {
-      res.status(400).json({ error: data.error.format() });
-      return;
-    }
-    const { username, email, password } = data.data;
-    console.log(username, password);
+    const { username, email, password } = req.body;
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       res.status(400).json({ msg: "User already exists. Sign in instead." });
@@ -25,7 +15,8 @@ const register = async (req: Request, res: Response): Promise<void> => {
     }
     const hPassword = await generateHash(password);
     const userData = {
-      ...data.data,
+      username,
+      email,
       password: hPassword,
     };
     const user = await User.create(userData);
@@ -38,14 +29,9 @@ const register = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.log(error);
   }
-};
-const signin = async (req: Request, res: Response): Promise<void> => {
-  const result = LoginSchema.safeParse(req.body);
-  if (!result.success) {
-    res.status(400).json({ error: result.error.format() });
-    return;
-  }
-  const { username, password } = result.data;
+});
+userRouter.post("/login", async (req: Request, res: Response) => {
+  const { username, password } = req.body;
   const user = await User.findOne({ username });
   if (!user) {
     res.status(400).json({ msg: "User not found" });
@@ -55,50 +41,97 @@ const signin = async (req: Request, res: Response): Promise<void> => {
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
     res.status(401).json({ msg: "Invalid credentials" });
-    return;
   }
-  const id = user._id.toString();
-  generateJwtAndSetCookie(id, res);
+  const id = user.id;
+  const token = await generateJwtAndSetCookie(id, res);
+  console.log(token);
 
-  res.status(200).json({ msg: "Login Successfully", id });
-};
-const signout = async (req: Request, res: Response) => {
-  try {
-    res.clearCookie("token", {
-      httpOnly: true,
-      sameSite: "strict", // Same SameSite setting as during login
-      secure: process.env.NODE_ENV === "production", // Ensure secure is set based on environment
-    });
-    res.status(200).json({ msg: "Logged out successfully" }); // Respond with a success message
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ msg: "Internal Server Error" }); // Handle any errors
-  }
-};
-const getMe = async (req: Request, res: Response) => {
-  try {
-    const authUser = req.user;
-    let id;
-    if (authUser) {
-      id = authUser._id;
-    }
-    const user = await User.findById(id).select("-password");
-    if (!user) {
-      res.status(401).json({
-        msg: "Unauthorized Access: User not found.",
+  res.status(200).json({ msg: "Login Successfully", id, username, token });
+});
+userRouter.get(
+  "/",
+  middleware.auth as RequestHandler,
+  async (req: Request, res: Response) => {
+    try {
+      const authUser = (req as CustomRequest).user;
+      let id;
+      if (authUser) {
+        id = authUser._id;
+      }
+      const user = await User.findById(id).select("-password");
+      if (!user) {
+        res.status(401).json({
+          msg: "Unauthorized Access: User not found.",
+        });
+        return;
+      }
+      res.status(200).json({
+        msg: "Authenticated User Present",
+        user,
       });
-      return;
+    } catch (error) {
+      console.error("Error in getMe:", error); // Log the error for debugging
+      res.status(500).json({
+        msg: "Internal Server Error",
+        error: error instanceof Error ? error.message : error,
+      });
     }
-    res.status(200).json({
-      msg: "Authenticated User Present",
-      user,
-    });
-  } catch (error) {
-    console.error("Error in getMe:", error); // Log the error for debugging
-    res.status(500).json({
-      msg: "Internal Server Error",
-      error: error instanceof Error ? error.message : error,
-    });
+  },
+);
+userRouter.post(
+  "/changepass",
+  middleware.auth as RequestHandler,
+  async (req: Request, res: Response) => {
+    const { oldPass, newPass } = req.body;
+    const user = (req as CustomRequest).user;
+    const oldHash = await generateHash(oldPass);
+    if (oldHash === user.password) {
+      const newHash = await generateHash(newPass);
+      user.password = newHash;
+      await user.save();
+      res.status(201).send({ msg: "Password Changed Successfully" });
+      return;
+    } else {
+      res.status(404).send({ msg: "unauthorized access" });
+    }
+  },
+);
+userRouter.post(
+  "/follow/:id",
+  middleware.auth as RequestHandler,
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params; // user to follow/unfollow
+      const userId = (req as CustomRequest).user.id; // logged-in user
+
+      if (userId === id) {
+        return res.status(400).json({ msg: "You cannot follow yourself" });
+      }
+
+      const targetUser = await User.findById(id);
+      if (!targetUser) {
+        return res.status(404).json({ msg: "User not found" });
+      }
+
+      // Check if already following
+      const isFollowing = targetUser.followers.includes(userId);
+
+      if (isFollowing) {
+        // Unfollow
+        await User.findByIdAndUpdate(id, { $pull: { followers: userId } });
+        await User.findByIdAndUpdate(userId, { $pull: { following: id } });
+        return res.status(200).json({ msg: "Unfollowed successfully" });
+      } else {
+        // Follow
+        await User.findByIdAndUpdate(id, { $addToSet: { followers: userId } });
+        await User.findByIdAndUpdate(userId, { $addToSet: { following: id } });
+        return res.status(200).json({ msg: "Followed successfully" });
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ msg: "Server error" });
+    }
   }
-};
-export { register, signin, signout, getMe };
+);
+
+export default userRouter;

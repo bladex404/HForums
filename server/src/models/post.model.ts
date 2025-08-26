@@ -1,5 +1,11 @@
 import { model, Schema, Types } from "mongoose";
-import { PostType } from "../schemas/post.schema";
+interface PostType extends Document{
+  title: string;
+  description:string;
+  postImg: string;
+  likes: Types.ObjectId[];
+  comments: Types.ObjectId[];
+}
 const postSchema = new Schema<PostType>({
   title: {
     type: String,
@@ -24,9 +30,16 @@ const postSchema = new Schema<PostType>({
     {
       type: Types.ObjectId,
       default: [],
-      ref: "User",
+      ref: "Comment",
     },
   ],
 });
+postSchema.set('toJSON', {
+  transform(document,returnedObject) {
+    returnedObject.id = returnedObject._id.toString()
+    delete returnedObject._id
+    delete returnedObject.__v
+  },
+})
 const Post = model("Post", postSchema);
 export default Post;

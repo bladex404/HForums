@@ -1,7 +1,6 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
 export interface IUser extends Document {
-  _id: Types.ObjectId; // <-- explicitly define _id type here
   username: string;
   password: string;
   profilePic?: string;
@@ -10,7 +9,7 @@ export interface IUser extends Document {
   following: mongoose.Types.ObjectId[];
 }
 
-const UserModel = new Schema<IUser>(
+const userSchema = new Schema<IUser>(
   {
     username: { type: String, required: true },
     password: { type: String, required: true },
@@ -21,5 +20,11 @@ const UserModel = new Schema<IUser>(
   },
   { timestamps: true }
 );
-
-export default mongoose.model<IUser>("User", UserModel);
+userSchema.set('toJSON', {
+  transform: (document, returnedObject) =>{
+    returnedObject.id = returnedObject._id.toString()
+    delete returnedObject?._id
+    delete returnedObject?.__v
+  }
+})
+export default mongoose.model<IUser>("User",userSchema);
