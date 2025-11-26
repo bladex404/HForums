@@ -1,17 +1,38 @@
 import Post from "../models/post.model";
-import User from "../models/user.model";
 import { Request, RequestHandler, Response } from "express";
 import { Router } from "express";
 import middleware, { CustomRequest } from "../middlewares/middleware";
 import Comment from "../models/comment.model";
+import multer from "multer";
+import generateCloudinaryUrl from "../utils/generateCloudiaryUrl";
 const postRouter = Router();
+const storage = multer.diskStorage({
+  destination: function(req:Request, file, cb){
+    cb(null, './static')
+  },
+  filename: function(req:Request, file,cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    return cb(null, `${uniqueSuffix}-${file.originalname}`)
+  }
+})
+const upload = multer({
+  storage: storage
+});
 postRouter.post(
   "/",
+  upload.single("postImg"),
   middleware.auth as RequestHandler,
   async (req: Request, res: Response) => {
     const { title, description } = req.body;
     try {
-      const post = new Post({ title, description });
+      const file = req.file;
+      let postPic;
+      if (file){
+       postPic =await generateCloudinaryUrl(file.path);
+      } else{
+        postPic="";
+      }
+      const post = new Post({ title, description, postImg:postPic });
       await post.save();
       res.status(201).json({
         msg: "Post created successfully",
@@ -46,7 +67,9 @@ postRouter.delete(
   },
 );
 postRouter.get("/", async (req: Request, res: Response) => {
-  const posts = await Post.find({});
+  const posts = await Post.find({}).populate("comments").sort({
+    "createdAt": -1
+  });
   if (posts) {
     res.send({ posts });
   } else {
@@ -57,7 +80,7 @@ postRouter.get("/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const post = await Post.findById(id).populate({
-    path: "likes",
+    path: "comments",
     select: "-password",
   });
   if (!post) {

@@ -143,3 +143,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+* {
+  box-sizing: border-box;
+  font-family: "Bitcount Ink", system-ui, sans-serif;
+}
+.container {
+  margin: 0 auto;
+  max-width: 786px;
+}
+
+.layout {
+  height: 100vh;
+  background-image: linear-gradient(
+    to bottom,
+    white,
+    rgb(255, 205, 255),
+    white
+  );
+}
+

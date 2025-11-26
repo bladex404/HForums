@@ -2,7 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import userRouter from "./controllers/user.controller";
-import postRouter from "./controllers/post .controller";
+import postRouter from "./controllers/post.controller";
 import chatRouter from "./controllers/conversation.controller";
 import middleware from "./middlewares/middleware";
 const app = express();

@@ -45,11 +45,16 @@ userRouter.post("/login", async (req: Request, res: Response) => {
   const id = user.id;
   const token = await generateJwtAndSetCookie(id, res);
   console.log(token);
-
+  res.cookie('token', token,{
+    maxAge: 24*3600*1000,
+    httpOnly: true,
+    sameSite:'strict' ,
+    secure: false
+  })
   res.status(200).json({ msg: "Login Successfully", id, username, token });
 });
 userRouter.get(
-  "/",
+  "/getMe",
   middleware.auth as RequestHandler,
   async (req: Request, res: Response) => {
     try {
@@ -105,27 +110,28 @@ userRouter.post(
       const userId = (req as CustomRequest).user.id; // logged-in user
 
       if (userId === id) {
-        return res.status(400).json({ msg: "You cannot follow yourself" });
+        res.status(400).json({ msg: "You cannot follow yourself" });
+        return;
       }
 
       const targetUser = await User.findById(id);
       if (!targetUser) {
-        return res.status(404).json({ msg: "User not found" });
+        res.status(404).json({ msg: "User not found" });
+        return;
       }
 
-      // Check if already following
       const isFollowing = targetUser.followers.includes(userId);
 
       if (isFollowing) {
-        // Unfollow
         await User.findByIdAndUpdate(id, { $pull: { followers: userId } });
         await User.findByIdAndUpdate(userId, { $pull: { following: id } });
-        return res.status(200).json({ msg: "Unfollowed successfully" });
+        res.status(200).json({ msg: "Unfollowed successfully" });
+        return;
       } else {
-        // Follow
         await User.findByIdAndUpdate(id, { $addToSet: { followers: userId } });
         await User.findByIdAndUpdate(userId, { $addToSet: { following: id } });
-        return res.status(200).json({ msg: "Followed successfully" });
+        res.status(200).json({ msg: "Followed successfully" });
+        return;
       }
     } catch (error) {
       console.error(error);
@@ -133,5 +139,11 @@ userRouter.post(
     }
   }
 );
+
+userRouter.get("/logout", middleware.auth as RequestHandler, async(req:Request,res:Response) =>{
+  res.clearCookie('token');
+  res.status(200).send("logout successfull");
+  res.end();
+})
 
 export default userRouter;

@@ -1,7 +1,16 @@
+import Container from "@/components/Container";
+import Hero from "@/components/Hero";
+import Navbar from "@/components/Navbar";
+
 const LandingPage = () => {
   return (
-    <div>
-      <h1>LandingPage</h1>
+    <div className="layout">
+      <Container>
+        <div>
+          <Navbar />
+          <Hero />
+        </div>
+      </Container>
     </div>
   );
 };

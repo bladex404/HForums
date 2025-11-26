@@ -1,5 +1,6 @@
 import { model, Schema } from "mongoose";
 interface CommentType {
+  id:String;
   userId: String;
   content: String;
   postId: String;

@@ -1,5 +1,6 @@
 import { model, Schema, Types } from "mongoose";
 interface PostType extends Document{
+  id:string;
   title: string;
   description:string;
   postImg: string;
@@ -33,6 +34,8 @@ const postSchema = new Schema<PostType>({
       ref: "Comment",
     },
   ],
+},{
+  timestamps:true
 });
 postSchema.set('toJSON', {
   transform(document,returnedObject) {

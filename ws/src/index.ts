@@ -12,7 +12,6 @@ const PORT = 4000;
 const app = express();
 const server = http.createServer(app);
 
-// Create WebSocket server without binding directly to a port
 const wss = new WebSocketServer({ noServer: true });
 
 interface Data {
@@ -20,8 +19,7 @@ interface Data {
   conversationId: number;
   text: string;
 }
-let toUserId;
-// Handle HTTP → WS upgrade
+let toUserId: any;
 server.on("upgrade", function (req: CustomRequest, socket: Socket, head) {
   socket.on("error", console.error);
 
@@ -45,22 +43,18 @@ server.on("upgrade", function (req: CustomRequest, socket: Socket, head) {
   });
 });
 
-// Handle WebSocket connection
-wss.on("connection", function connection(ws, req: CustomRequest) {
+wss.on("connection", function connection(ws, _: CustomRequest) {
   ws.on("error", console.error);
 
   ws.on("message", async function message(raw) {
     try {
       const message: Data = JSON.parse(raw.toString());
-
-      // broadcast to all clients
       wss.clients.forEach(function each(client) {
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify(message));
         }
       });
 
-      // save message to API
       const res = await fetch(
         `http://localhost:3000/api/v1/chats/messages/:${toUserId}`,
         {

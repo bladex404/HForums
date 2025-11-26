@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { FormEvent, ChangeEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { FormEvent, ChangeEvent } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
   CardAction,
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { toast } from "react-toastify";
 export interface LoginTypes {
   username: string;
   password: string;
@@ -34,13 +35,15 @@ export function Signin() {
     }));
   };
   const queryClient = useQueryClient();
-  const { mutate: signin } = useMutation({
+  const { mutate: signin, isPending,isError,error,isSuccess } = useMutation({
     mutationFn: async (formData: LoginTypes) => {
       try {
         const response = await axios.post(
           "http://localhost:3000/api/v1/users/login",
           formData,
+          
           {
+            withCredentials: true,
             headers: {
               "Content-Type": "application/json",
             },
@@ -49,11 +52,21 @@ export function Signin() {
         console.log(response.data.msg);
       } catch (error) {}
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries(["user"]);
-      navigate("/home");
-    },
+   
   });
+  let toastId;
+  if(isPending){
+    toastId = toast.loading("Signing in..")
+  }
+  if(isSuccess){
+      queryClient.invalidateQueries(["user"]);
+      if (toastId){
+      toast.done(toastId)
+      }
+      toast.success("Signed in",{toastId:toastId})
+      navigate("/posts");
+  }
+  
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     signin(formData);
@@ -104,8 +117,10 @@ export function Signin() {
               </div>
             </div>
             <CardFooter className="flex-col mt-6 gap-2">
-              <Button type="submit" className="w-full">
-                Login
+              <Button type="submit" disabled={isPending} className="w-full">
+              {
+                isPending?"Signing": "Signin"
+              }
               </Button>
             </CardFooter>
           </form>
